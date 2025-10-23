@@ -4,6 +4,9 @@
   "description": "Backend for Z-App with integrated frontend build",
   "main": "src/index.js",
   "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
@@ -25,9 +28,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.7"
-  },
-  "engines": {
-    "node": ">=18"
   },
   "keywords": [],
   "author": "",
