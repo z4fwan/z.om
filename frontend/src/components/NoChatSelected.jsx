@@ -1,7 +1,7 @@
 const NoChatSelected = () => {
   return (
-    // w-full flex-1 ensures it takes the remaining width and height
-    <div className="w-full flex-1 flex flex-col items-center justify-center p-6 bg-base-100/50">
+    // Hidden on small screens, block on medium (desktop) screens
+    <div className="hidden md:flex w-full flex-1 flex-col items-center justify-center p-6 bg-base-100/50">
       <div className="max-w-md text-center space-y-6">
         <div className="flex justify-center gap-4 mb-4">
           <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center animate-bounce">
@@ -9,7 +9,6 @@ const NoChatSelected = () => {
           </div>
         </div>
 
-        {/* This is the section with "Welcome to Z-APP!" and the message */}
         <h2 className="text-2xl font-bold">Welcome to Z-APP!</h2>
         <p className="text-base-content/60">
           Select a conversation from the sidebar to start chatting
