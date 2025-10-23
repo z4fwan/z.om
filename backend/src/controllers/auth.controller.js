@@ -51,7 +51,6 @@ export const signup = async (req, res) => {
 			bio: bio || "",
 			password: hashedPassword,
 			profilePic: uploadedProfilePic,
-			// hasCompletedProfile will default to false, which is correct
 		});
 
 		await newUser.save();
@@ -131,13 +130,15 @@ export const login = async (req, res) => {
 // --- *** THIS FUNCTION IS NOW FIXED *** ---
 export const logout = (req, res) => {
 	try {
-        // You MUST include the same secure and sameSite options
-        // that you used when *setting* the cookie.
+        // The options to clear the cookie MUST match the options
+        // used in generateToken.js
 		res.cookie("jwt", "", {
             httpOnly: true,
             expires: new Date(0), // Set expiry to a past date
-            secure: process.env.NODE_ENV !== "development", // Must be true for cross-domain (HTTPS)
-            sameSite: "none", // Must be 'none' for cross-domain
+            
+            // Use the same conditional logic as generateToken
+            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         });
 		res.status(200).json({ message: "Logged out successfully." });
 	} catch (error) {
@@ -162,8 +163,7 @@ export const completeProfileSetup = async (req, res) => {
 			return res.status(404).json({ message: "User not found." });
 		}
 
-		// Upload profile picture to Cloudinary if provided
-		let uploadedProfilePic = user.profilePic; // Keep old one if new one isn't sent
+		let uploadedProfilePic = user.profilePic;
 		if (profilePic) {
 			try {
 				const uploadResult = await cloudinary.uploader.upload(profilePic);
@@ -174,15 +174,12 @@ export const completeProfileSetup = async (req, res) => {
 			}
 		}
 
-		// Update user
 		user.nickname = nickname;
-		user.bio = bio || ""; // Default to empty string
+		user.bio = bio || "";
 		user.profilePic = uploadedProfilePic;
-		user.hasCompletedProfile = true; // Mark profile as complete
+		user.hasCompletedProfile = true;
 
 		const updatedUser = await user.save();
-
-		// Return the full, updated user object (excluding password)
 		const userObject = updatedUser.toObject();
 		delete userObject.password;
 
@@ -196,7 +193,7 @@ export const completeProfileSetup = async (req, res) => {
 // ─── Update Profile ─────────────────────────────────────
 export const updateProfile = async (req, res) => {
 	try {
-		const { profilePic } = req.body; // You can expand this later
+		const { profilePic } = req.body;
 		const userId = req.user._id;
 
 		if (!profilePic) {
@@ -221,7 +218,7 @@ export const updateProfile = async (req, res) => {
 export const checkAuth = async (req, res) => {
 	try {
 		const user = await User.findById(req.user._id).select("-password");
-		if (!user) return res.status(404).json({ message: "User not found." });
+		if (!user) return res.status(4404).json({ message: "User not found." });
 
 		res.status(200).json({
 			_id: user._id,
@@ -245,7 +242,6 @@ export const checkAuth = async (req, res) => {
 	}
 };
 
-// ... (your forgotPassword and resetPassword functions remain unchanged) ...
 // ─── Forgot Password ─────────────────────────────────────
 export const forgotPassword = async (req, res) => {
 	const { email } = req.body;
