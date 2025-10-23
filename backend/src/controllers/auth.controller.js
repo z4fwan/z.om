@@ -32,9 +32,6 @@ export const signup = async (req, res) => {
 		const salt = await bcrypt.genSalt(10);
 		const hashedPassword = await bcrypt.hash(password, salt);
 
-		// Note: profilePic on signup is now handled by completeProfileSetup
-		// We can remove the cloudinary upload from here if we want to *force* profile setup,
-		// but for now we'll leave it in case they provided it.
 		let uploadedProfilePic = "";
 		if (profilePic) {
 			try {
@@ -68,7 +65,7 @@ export const signup = async (req, res) => {
 			nickname: newUser.nickname,
 			bio: newUser.bio,
 			profilePic: newUser.profilePic,
-			hasCompletedProfile: newUser.hasCompletedProfile, // ✅ ADDED
+			hasCompletedProfile: newUser.hasCompletedProfile,
 			isAdmin: newUser.email === process.env.ADMIN_EMAIL,
 			isBlocked: newUser.isBlocked,
 			isSuspended: newUser.isSuspended,
@@ -116,7 +113,7 @@ export const login = async (req, res) => {
 			nickname: user.nickname,
 			bio: user.bio,
 			profilePic: user.profilePic,
-			hasCompletedProfile: user.hasCompletedProfile, // ✅ ADDED
+			hasCompletedProfile: user.hasCompletedProfile,
 			isAdmin: user.email === process.env.ADMIN_EMAIL,
 			isBlocked: user.isBlocked,
 			isSuspended: user.isSuspended,
@@ -131,17 +128,26 @@ export const login = async (req, res) => {
 };
 
 // ─── Logout ─────────────────────────────────────────────
+// --- *** THIS FUNCTION IS NOW FIXED *** ---
 export const logout = (req, res) => {
 	try {
-		res.cookie("jwt", "", { httpOnly: true, expires: new Date(0) });
+        // You MUST include the same secure and sameSite options
+        // that you used when *setting* the cookie.
+		res.cookie("jwt", "", {
+            httpOnly: true,
+            expires: new Date(0), // Set expiry to a past date
+            secure: process.env.NODE_ENV !== "development", // Must be true for cross-domain (HTTPS)
+            sameSite: "none", // Must be 'none' for cross-domain
+        });
 		res.status(200).json({ message: "Logged out successfully." });
 	} catch (error) {
 		console.error("Logout Error:", error);
 		res.status(500).json({ message: "Logout failed. Please try again." });
 	}
 };
+// --- *** END OF FIXED FUNCTION *** ---
 
-// ✅ --- NEW FUNCTION FOR ONBOARDING ---
+// --- NEW FUNCTION FOR ONBOARDING ---
 export const completeProfileSetup = async (req, res) => {
 	try {
 		const { nickname, bio, profilePic } = req.body;
@@ -172,7 +178,7 @@ export const completeProfileSetup = async (req, res) => {
 		user.nickname = nickname;
 		user.bio = bio || ""; // Default to empty string
 		user.profilePic = uploadedProfilePic;
-		user.hasCompletedProfile = true; // ✅ Mark profile as complete
+		user.hasCompletedProfile = true; // Mark profile as complete
 
 		const updatedUser = await user.save();
 
@@ -188,7 +194,6 @@ export const completeProfileSetup = async (req, res) => {
 };
 
 // ─── Update Profile ─────────────────────────────────────
-// This is for *later* updates, not the initial setup
 export const updateProfile = async (req, res) => {
 	try {
 		const { profilePic } = req.body; // You can expand this later
@@ -226,7 +231,7 @@ export const checkAuth = async (req, res) => {
 			nickname: user.nickname,
 			bio: user.bio,
 			profilePic: user.profilePic,
-			hasCompletedProfile: user.hasCompletedProfile, // ✅ ADDED
+			hasCompletedProfile: user.hasCompletedProfile,
 			isAdmin: user.email === process.env.ADMIN_EMAIL,
 			isBlocked: user.isBlocked,
 			isSuspended: user.isSuspended,
