@@ -25,8 +25,8 @@ const Navbar = () => {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [searchResults, setSearchResults] = useState([]);
 	const [isLoadingSearch, setIsLoadingSearch] = useState(false);
-	// We will use a separate state for the mobile search overlay
-	const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false); 
+	// State for the mobile full-screen search overlay
+	const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
 	const searchRef = useRef(null);
 
 	// Friend request state
@@ -69,7 +69,8 @@ const Navbar = () => {
 		const handleClickOutside = (event) => {
 			// Handle desktop search dropdown
 			if (searchRef.current && !searchRef.current.contains(event.target) && !isSearchOverlayOpen) {
-				// We don't use this state on mobile anymore, but keep it for desktop logic
+				// We don't need to do anything here since desktop search only shows results 
+				// when searchQuery is present, but keep the ref logic clean.
 			}
 			// Handle friend request dropdown
 			if (
@@ -86,7 +87,7 @@ const Navbar = () => {
 	}, [isSearchOverlayOpen]);
 
 
-	// Clear search function, now also closes the mobile overlay
+	// Clear search function, closes mobile overlay, and resets query
 	const clearSearch = () => {
 		setSearchQuery("");
 		setSearchResults([]);
@@ -131,7 +132,6 @@ const Navbar = () => {
 								className="input input-bordered input-sm w-full pl-9"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
-								// Simplified onFocus behavior for desktop dropdown
 							/>
 							<div className="absolute inset-y-0 right-0 pr-3 flex items-center">
 								{isLoadingSearch ? (
@@ -150,7 +150,7 @@ const Navbar = () => {
 						</div>
 						{/* Search Results Dropdown (Desktop) */}
 						{searchQuery && !isLoadingSearch && (
-							<div className="absolute top-full mt-2 w-full bg-base-100 border border-base-300 rounded-lg shadow-xl max-h-96 overflow-y-auto">
+							<div className="absolute top-full mt-2 w-full bg-base-100 border border-base-300 rounded-lg shadow-xl max-h-96 overflow-y-auto z-50">
 								{searchResults.length === 0 ? (
 									<div className="p-4 text-center text-sm text-base-content/60">
 										No users found for &quot;{searchQuery}&quot;
@@ -189,7 +189,7 @@ const Navbar = () => {
 					{/* 3. Navigation Buttons - Optimized for Mobile */}
 					<div className="flex items-center gap-1 flex-shrink-0">
 
-						{/* Search Icon (Mobile Only) */}
+						{/* Search Icon (Mobile Only) - Opens overlay */}
 						<button
 							onClick={() => setIsSearchOverlayOpen(true)}
 							className="btn btn-ghost btn-circle btn-sm md:hidden"
@@ -335,7 +335,7 @@ const Navbar = () => {
 				</div>
 			</div>
 
-			{/* 4. Mobile Search Overlay - Full screen search experience */}
+			{/* 4. Mobile Search Overlay - Full screen search experience (FIXED) */}
 			{isSearchOverlayOpen && (
 				<div className="fixed inset-0 z-50 bg-base-100 md:hidden">
 					<div className="p-4 flex flex-col h-full">
@@ -350,7 +350,7 @@ const Navbar = () => {
 								className="input input-bordered input-lg w-full pl-10 pr-12 text-base font-medium"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
-								autoFocus // Focus automatically when the overlay opens
+								autoFocus
 							/>
 							<div className="absolute inset-y-0 right-0 pr-2 flex items-center">
 								{isLoadingSearch ? (
@@ -367,9 +367,8 @@ const Navbar = () => {
 							</div>
 						</div>
 
-						{/* Search Results Area */}
+						{/* Search Results Area (FIXED rendering logic) */}
 						<div className="flex-grow mt-4 overflow-y-auto">
-							{/* ... (Search results rendering logic - using the same logic as desktop) ... */}
 							{searchQuery.trim() && (
 								<>
 									{isLoadingSearch && searchResults.length === 0 ? (
@@ -385,7 +384,7 @@ const Navbar = () => {
 											<Link
 												to={`/profile/${user.username}`}
 												key={user._id}
-												onClick={clearSearch} // Clear search and close overlay on click
+												onClick={clearSearch}
 												className="flex items-center gap-3 p-3 hover:bg-base-200 transition"
 											>
 												<div className="avatar">
@@ -411,7 +410,7 @@ const Navbar = () => {
 							)}
 						</div>
 
-						{/* Close button for mobile overlay (optional, as X button is in the input) */}
+						{/* Close button (optional) */}
 						<div className="flex-shrink-0 mt-4">
 							<button
 								onClick={clearSearch}
