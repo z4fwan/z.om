@@ -69,7 +69,7 @@ const Navbar = () => {
 		const handleClickOutside = (event) => {
 			// Handle desktop search dropdown
 			if (searchRef.current && !searchRef.current.contains(event.target) && !isSearchOverlayOpen) {
-				// We don't need to do anything here since desktop search only shows results 
+				// We don't need to do anything here since desktop search only shows results 
 				// when searchQuery is present, but keep the ref logic clean.
 			}
 			// Handle friend request dropdown
@@ -356,35 +356,50 @@ const Navbar = () => {
 								{isLoadingSearch ? (
 									<Loader2 className="h-5 w-5 animate-spin text-primary" />
 								) : (
-									<button
-										onClick={clearSearch}
-										className="btn btn-ghost btn-lg btn-circle"
-										aria-label="Close search"
-									>
-										<X className="h-6 w-6 text-base-content/60" />
-									</button>
+									// ✅ FIX: Show the clear button only if there is a query, otherwise show close button
+									searchQuery ? (
+										<button
+											onClick={clearSearch}
+											className="btn btn-ghost btn-lg btn-circle"
+											aria-label="Clear search"
+										>
+											<X className="h-6 w-6" /> 
+										</button>
+									) : (
+										<button
+											onClick={clearSearch} // clearSearch closes the overlay too
+											className="btn btn-ghost btn-lg btn-circle"
+											aria-label="Close search"
+										>
+											<X className="h-6 w-6 text-base-content/60" />
+										</button>
+									)
 								)}
 							</div>
 						</div>
 
 						{/* Search Results Area (FIXED rendering logic) */}
 						<div className="flex-grow mt-4 overflow-y-auto">
+							{/* The rendering condition must be checked before showing results */}
 							{searchQuery.trim() && (
 								<>
+									{/* Loading State */}
 									{isLoadingSearch && searchResults.length === 0 ? (
 										<div className="p-4 text-center text-sm text-base-content/60">
 											Searching...
 										</div>
 									) : searchResults.length === 0 ? (
+										/* No Results Found State */
 										<div className="p-4 text-center text-sm text-base-content/60">
 											No users found for &quot;{searchQuery}&quot;
 										</div>
 									) : (
+										/* Render Mapped Results */
 										searchResults.map((user) => (
 											<Link
 												to={`/profile/${user.username}`}
 												key={user._id}
-												onClick={clearSearch}
+												onClick={clearSearch} // Clears query AND closes the overlay
 												className="flex items-center gap-3 p-3 hover:bg-base-200 transition"
 											>
 												<div className="avatar">
