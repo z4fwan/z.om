@@ -4,7 +4,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
-import { Search, X, Video, Menu } from "lucide-react";
+import { Search, X, Video } from "lucide-react";
 
 const Sidebar = () => {
   const {
@@ -19,7 +19,7 @@ const Sidebar = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Removed: mobileMenuOpen state and logic
 
   const filteredUsers = friends
     .filter((u) => u && u._id)
@@ -38,46 +38,24 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile Menu Toggle Button - Shows when chat is selected on mobile */}
-      {selectedUser && (
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden fixed top-4 left-4 z-50 p-3 bg-primary text-primary-content rounded-full shadow-lg hover:bg-primary-focus transition-all"
-          aria-label="Toggle menu"
-        >
-          <Menu size={24} />
-        </button>
-      )}
-
-      {/* Sidebar - Responsive */}
+      {/* 1. Sidebar Container */}
       <aside
         className={`
-          ${selectedUser && !mobileMenuOpen ? "hidden" : "block"} 
+          ${selectedUser ? "hidden" : "block"} 
           md:block 
           w-full md:w-96 
           bg-base-100 
           border-r border-base-300
-          ${mobileMenuOpen ? "fixed inset-0 z-40 md:relative" : ""}
+          h-screen overflow-y-hidden
+          flex flex-col // Added flex-col to manage scrolling better
         `}
       >
-        {/* Close button for mobile menu */}
-        {mobileMenuOpen && (
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden absolute top-4 right-4 z-50 p-2 bg-base-200 rounded-full"
-            aria-label="Close menu"
-          >
-            <X size={20} />
-          </button>
-        )}
-
-        {/* Header */}
-        <div className="p-4 border-b border-base-300 md:p-3">
-          {/* Stranger Chat Button - Mobile optimized */}
+        {/* Header - Sticky for better mobile UX */}
+        <div className="flex-shrink-0 p-4 border-b border-base-300 bg-base-100/90 backdrop-blur-sm md:p-3 sticky top-0 z-10">
+          {/* Stranger Chat Button */}
           <Link
             to="/stranger"
             className="btn btn-primary w-full mb-4 h-12 md:h-10 text-base md:text-sm"
-            onClick={() => setMobileMenuOpen(false)}
           >
             <Video size={20} className="md:w-[18px] md:h-[18px]" />
             <span className="ml-2">Start Stranger Chat</span>
@@ -105,16 +83,15 @@ const Sidebar = () => {
           </label>
         </div>
 
-        {/* Content */}
-        <div className="p-4 md:p-3">
-          {/* Stories - Mobile optimized with better scrolling */}
-          <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 md:pb-3 -mx-2 px-2 scrollbar-hide">
+        {/* Content - Scrollable area */}
+        <div className="p-4 md:p-3 flex-grow overflow-y-auto">
+          {/* Stories/Quick Access */}
+          <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 md:pb-3 -mx-2 px-2 scrollbar-hide border-b border-base-200">
             {friends.slice(0, 8).map((u) => (
               <button
                 key={u._id}
                 onClick={() => {
                   setSelectedUser(u);
-                  setMobileMenuOpen(false);
                 }}
                 className="flex-none flex flex-col items-center gap-2 md:gap-1 min-w-[60px] md:min-w-[48px]"
               >
@@ -132,8 +109,8 @@ const Sidebar = () => {
             ))}
           </div>
 
-          {/* Users list - Mobile optimized */}
-          <div className="flex flex-col gap-2 max-h-[calc(100vh-280px)] md:max-h-[calc(100vh-200px)] overflow-y-auto mt-4">
+          {/* Users list */}
+          <div className="flex flex-col gap-2 mt-4">
             {isFriendsLoading ? (
               <SidebarSkeleton />
             ) : filteredUsers.length === 0 ? (
@@ -149,7 +126,6 @@ const Sidebar = () => {
                     key={user._id}
                     onClick={() => {
                       setSelectedUser(user);
-                      setMobileMenuOpen(false);
                     }}
                     className={`w-full flex items-center gap-4 md:gap-3 p-4 md:p-2 rounded-lg text-left transition-all active:scale-98 ${
                       selectedUser?._id === user._id
@@ -194,7 +170,7 @@ const Sidebar = () => {
         </div>
       </aside>
 
-      {/* Floating Search Overlay - Mobile optimized */}
+      {/* 2. Floating Search Overlay */}
       {searchOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center z-50 pt-16 md:pt-20 px-4 animate-fadeIn">
           <div className="bg-base-100 p-5 md:p-4 rounded-xl shadow-lg w-full max-w-lg border-2 border-primary">
@@ -208,8 +184,11 @@ const Sidebar = () => {
                 className="flex-1 p-3 md:p-2 outline-none bg-transparent text-base md:text-sm"
                 autoFocus
               />
-              <button 
-                onClick={() => setSearchOpen(false)}
+              <button
+                onClick={() => {
+                  setSearchOpen(false);
+                  setQuery(""); // Clear query when closing search
+                }}
                 className="p-2 hover:bg-base-200 rounded-full transition-colors flex-shrink-0"
                 aria-label="Close search"
               >
@@ -226,7 +205,6 @@ const Sidebar = () => {
                       onClick={() => {
                         setSelectedUser(user);
                         setSearchOpen(false);
-                        setMobileMenuOpen(false);
                       }}
                       className="p-3 md:p-2 rounded hover:bg-primary/20 active:bg-primary/30 cursor-pointer transition-colors text-base md:text-sm"
                     >
@@ -242,14 +220,6 @@ const Sidebar = () => {
             )}
           </div>
         </div>
-      )}
-
-      {/* Overlay backdrop for mobile menu */}
-      {mobileMenuOpen && (
-        <div
-          onClick={() => setMobileMenuOpen(false)}
-          className="md:hidden fixed inset-0 bg-black/40 z-30"
-        />
       )}
     </>
   );
