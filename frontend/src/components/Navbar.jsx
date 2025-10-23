@@ -67,11 +67,6 @@ const Navbar = () => {
 	// Click outside to close *both* dropdowns/overlays
 	useEffect(() => {
 		const handleClickOutside = (event) => {
-			// Handle desktop search dropdown
-			if (searchRef.current && !searchRef.current.contains(event.target) && !isSearchOverlayOpen) {
-				// We don't need to do anything here since desktop search only shows results 
-				// when searchQuery is present, but keep the ref logic clean.
-			}
 			// Handle friend request dropdown
 			if (
 				friendRequestRef.current &&
