@@ -62,13 +62,13 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/friends", friendRoutes);
 
-// --- ADDED THIS SECTION ---
+// --- *** THIS SECTION IS NOW FIXED *** ---
 
 // --- Serve Frontend ---
-// This code assumes your frontend 'dist' folder is one level up and in 'frontend/dist'
-// Adjust the path if your project structure is different
+// __dirname is .../backend/src
+// We need to go up two levels to the project root, then to /frontend/dist
 
-const frontendDistPath = path.join(__dirname, "../frontend/dist");
+const frontendDistPath = path.join(__dirname, "../../frontend/dist"); // <-- THIS LINE IS FIXED
 
 // 1. Serve static files from the React frontend build
 app.use(express.static(frontendDistPath));
@@ -79,7 +79,7 @@ app.get("*", (req, res) => {
 	res.sendFile(path.join(frontendDistPath, "index.html"));
 });
 
-// --- END OF ADDED SECTION ---
+// --- *** END OF FIXED SECTION *** ---
 
 // --- Default Admin Creation ---
 const createDefaultAdmin = async () => {
@@ -109,7 +109,7 @@ const createDefaultAdmin = async () => {
 				fullName: "Admin",
 				email: adminEmail,
 				username: adminUsername,
-		        nickname: "Admin",
+				nickname: "Admin",
 				password: hashedPassword,
 				isAdmin: true,
 				isVerified: true,
