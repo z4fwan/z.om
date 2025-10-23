@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
-import { ExternalLink, Eye, CheckCircle, XCircle } from "lucide-react"; // ✅ Import new icons
+import { ExternalLink, Eye, CheckCircle, XCircle } from "lucide-react";
 
 const AdminDashboard = () => {
 	// --- User State ---
@@ -11,16 +11,16 @@ const AdminDashboard = () => {
 	const [suspendReason, setSuspendReason] = useState("");
 	const [suspendDuration, setSuspendDuration] = useState("1d");
 
-	// ✅ --- Report State ---
+	// --- Report State ---
 	const [reports, setReports] = useState([]);
 	const [loadingReports, setLoadingReports] = useState(true);
 
 	// --- Fetch Users ---
 	const fetchUsers = async () => {
-		setLoadingUsers(true); // Ensure loading state is set at start
+		setLoadingUsers(true);
 		try {
 			const res = await axiosInstance.get("/admin/users");
-			const userList = Array.isArray(res.data) ? res.data : []; // Simplified check
+			const userList = Array.isArray(res.data) ? res.data : [];
 			setUsers(userList);
 		} catch (err) {
 			console.error("Error fetching users", err);
@@ -31,7 +31,7 @@ const AdminDashboard = () => {
 		}
 	};
 
-	// ✅ --- Fetch Reports ---
+	// --- Fetch Reports ---
 	const fetchReports = async () => {
 		setLoadingReports(true);
 		try {
@@ -49,48 +49,79 @@ const AdminDashboard = () => {
 	// --- Fetch Data on Mount ---
 	useEffect(() => {
 		fetchUsers();
-		fetchReports(); // ✅ Fetch reports too
+		fetchReports();
 	}, []);
 
 	// --- Action Handlers (Users) ---
 	const handleAction = async (userId, action, payload = {}) => {
-		// (User action logic - simplified for brevity, assume it's correct)
 		try {
-			if (action === "suspend") { setSuspendModal({ show: true, userId }); return; }
+            // This part is correct: it just opens the modal.
+			if (action === "suspend") {
+				setSuspendModal({ show: true, userId });
+				return;
+			}
+            
+            // All other actions (unsuspend, block, etc.) use this
 			const url = `/admin/${action}/${userId}`;
-			const method = action === 'delete' ? 'delete' : 'put'; // Handle delete method
+			const method = action === 'delete' ? 'delete' : 'put';
 			const res = await axiosInstance[method](url, payload);
+
 			toast.success(res.data.message || `${action} success`);
 			fetchUsers(); // Refetch users after action
-		} catch (err) { console.error(err); toast.error("Action failed"); }
+		} catch (err) {
+			console.error("Error in handleAction:", err);
+			toast.error(err.response?.data?.message || "Action failed");
+		}
 	};
+
+    // --- *** THIS FUNCTION IS NOW FIXED *** ---
 	const confirmSuspend = async () => {
-		// (Suspend modal logic - simplified)
-		try {
-			await handleAction(suspendModal.userId, 'suspend', { reason: suspendReason, until: getFutureDate(suspendDuration) });
-			setSuspendModal({ show: false, userId: null }); setSuspendReason(""); setSuspendDuration("1d");
-		} catch { /* handled in handleAction */ }
+        if (!suspendReason) {
+            toast.error("Please provide a reason for suspension.");
+            return;
+        }
+
+        const payload = {
+            reason: suspendReason,
+            until: getFutureDate(suspendDuration)
+        };
+        const userId = suspendModal.userId;
+
+        try {
+            // Manually make the API call instead of using handleAction
+            const res = await axiosInstance.put(`/admin/suspend/${userId}`, payload);
+            
+            toast.success(res.data.message || "User suspended successfully");
+            
+            fetchUsers(); // Refetch users to show new status
+            
+            // Close and reset modal
+            setSuspendModal({ show: false, userId: null });
+            setSuspendReason("");
+            setSuspendDuration("1d");
+
+        } catch (err) {
+            console.error("Failed to suspend user:", err);
+            toast.error(err.response?.data?.message || "Failed to suspend user");
+        }
 	};
+    // --- *** END OF FIXED FUNCTION *** ---
+
 	const getFutureDate = (durationStr) => { /* ... date calculation ... */
 		const now = new Date(); const num = parseInt(durationStr); const unit = durationStr.replace(num, "");
 		if (unit === "d" || unit === "") now.setDate(now.getDate() + num); else if (unit === "w") now.setDate(now.getDate() + num * 7); else if (unit === "m") now.setDate(now.getDate() + num * 30); return now.toISOString();
 	};
-	const handleDelete = async (userId) => { await handleAction(userId, 'delete'); };
+	
+    const handleDelete = async (userId) => { 
+        // We can just call handleAction for delete, since it doesn't need a modal
+        await handleAction(userId, 'delete'); 
+    };
 
-	// ✅ --- Action Handler (Reports - Placeholder) ---
+	// --- Action Handler (Reports) ---
 	const handleReportStatus = async (reportId, newStatus) => {
-		// TODO: Implement backend route and controller for this
+		// This is a placeholder, as noted in your code.
 		toast.info(`Updating report ${reportId} to ${newStatus}... (Backend needed)`);
-		// Example of optimistic update (remove when backend is ready)
 		setReports(prev => prev.map(r => r._id === reportId ? { ...r, status: newStatus } : r));
-		// try {
-		// 	await axiosInstance.put(`/admin/reports/${reportId}/status`, { status: newStatus });
-		// 	toast.success("Report status updated.");
-		// 	fetchReports(); // Re-fetch reports
-		// } catch (err) {
-		// 	console.error("Failed to update report status:", err);
-		// 	toast.error("Failed to update status.");
-		// }
 	};
 
 	return (
@@ -151,7 +182,7 @@ const AdminDashboard = () => {
 				{/* --- End Users Table Section --- */}
 
 
-				{/* ✅ --- Reports Table Section --- */}
+				{/* --- Reports Table Section --- */}
 				<section>
 					<h2 className="text-xl sm:text-2xl font-semibold mb-4">Moderation Reports</h2>
 					{loadingReports ? (
@@ -206,7 +237,6 @@ const AdminDashboard = () => {
 															<button onClick={() => handleReportStatus(report._id, 'dismissed')} className="btn btn-neutral btn-xs"><XCircle size={12}/> Dismiss</button>
 														</>
 													)}
-													{/* Can add buttons to take action directly like Block/Suspend */}
 												</div>
 											</td>
 										</tr>
@@ -216,7 +246,7 @@ const AdminDashboard = () => {
 						</div>
 					)}
 				</section>
-				{/* ✅ --- End Reports Table Section --- */}
+				{/* --- End Reports Table Section --- */}
 
 			</div>
 
