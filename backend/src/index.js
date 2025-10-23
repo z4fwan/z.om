@@ -28,11 +28,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Middleware ---
-
-// ✅ Increase payload limit BEFORE other middleware using the body
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-
 app.use(cookieParser());
 
 // CORS configuration
@@ -66,9 +63,9 @@ app.use("/api/friends", friendRoutes);
 
 // --- Serve Frontend ---
 // __dirname is .../backend/src
-// We need to go up two levels to the project root, then to /frontend/dist
+// We need to go up TWO levels (../../) to the project root, then to /frontend/dist
 
-const frontendDistPath = path.join(__dirname, "../../frontend/dist"); // <-- THIS LINE IS FIXED
+const frontendDistPath = path.join(__dirname, "../../frontend/dist"); // <-- THE FIX IS HERE
 
 // 1. Serve static files from the React frontend build
 app.use(express.static(frontendDistPath));
@@ -83,7 +80,6 @@ app.get("*", (req, res) => {
 
 // --- Default Admin Creation ---
 const createDefaultAdmin = async () => {
-	// ... (your admin creation code is correct) ...
 	try {
 		const adminEmail = process.env.ADMIN_EMAIL;
 		const adminUsername = process.env.ADMIN_USERNAME || "admin";
@@ -113,13 +109,12 @@ const createDefaultAdmin = async () => {
 				password: hashedPassword,
 				isAdmin: true,
 				isVerified: true,
-				hasCompletedProfile: true, // Make sure admin doesn't get stuck in setup
+				hasCompletedProfile: true,
 			});
 
 			await admin.save();
 			console.log(`✅ Default admin created: ${adminEmail}`);
 		} else if (!existingAdmin.hasCompletedProfile) {
-			// If admin exists but hasn't completed profile (e.g., from old version)
 			existingAdmin.hasCompletedProfile = true;
 			await existingAdmin.save();
 			console.log(
