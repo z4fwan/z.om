@@ -22,7 +22,7 @@ const REPORT_REASONS = [
 	"Other",
 ];
 
-// --- Report Modal Component ---
+// --- Report Modal Component (unchanged) ---
 const ReportModal = ({ isOpen, onClose, onSubmit, screenshotPreview, isSubmitting }) => {
 	const [reason, setReason] = useState("");
 	useEffect(() => { if (isOpen) setReason(""); }, [isOpen]);
@@ -67,12 +67,15 @@ const ReportModal = ({ isOpen, onClose, onSubmit, screenshotPreview, isSubmittin
 // --- Stranger Chat Page Component ---
 const StrangerChatPage = () => {
 	const { authUser, socket } = useAuthStore();
-	const { getFriendshipStatus } = useFriendStore();
+	// ✅ FIX: Get the full friend store and fetch function
+	const { getFriendshipStatus, fetchFriendData } = useFriendStore(); 
 	const navigate = useNavigate();
 
 	const [status, setStatus] = useState("idle");
 	const [tempMessages, setTempMessages] = useState([]);
 	const [currentMessage, setCurrentMessage] = useState("");
+	// ✅ FIX: Use null to track the partner's permanent ID
+	const [partnerUserId, setPartnerUserId] = useState(null); 
 	const [friendStatus, setFriendStatus] = useState("NOT_FRIENDS");
 	const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 	const [reportScreenshot, setReportScreenshot] = useState(null);
@@ -91,6 +94,7 @@ const StrangerChatPage = () => {
 
 	// --- WebRTC helper functions (unchanged from yours) ---
 	const createPeerConnection = useCallback(() => {
+		// ... (WebRTC connection logic) ...
 		console.log("WebRTC: Creating PeerConnection");
 		const pc = new RTCPeerConnection({
 			iceServers: [
@@ -127,6 +131,7 @@ const StrangerChatPage = () => {
 	}, [socket]);
 
 	const startCall = useCallback(async () => {
+		// ... (startCall logic) ...
 		console.log("WebRTC: Starting call as initiator");
 		if (!localStreamRef.current) {
 			console.error("No local stream!");
@@ -145,6 +150,7 @@ const StrangerChatPage = () => {
 	}, [createPeerConnection, socket]);
 
 	const handleOffer = useCallback(async (sdp) => {
+		// ... (handleOffer logic) ...
 		console.log("WebRTC: Received offer, creating answer");
 		if (!localStreamRef.current) {
 			console.error("No local stream for answer!");
@@ -170,6 +176,7 @@ const StrangerChatPage = () => {
 	}, [createPeerConnection, socket]);
 
 	const handleAnswer = useCallback(async (sdp) => {
+		// ... (handleAnswer logic) ...
 		console.log("WebRTC: Received answer");
 		const pc = peerConnectionRef.current;
 		if (!pc) return;
@@ -186,6 +193,7 @@ const StrangerChatPage = () => {
 	}, []);
 
 	const handleIceCandidate = useCallback(async (candidate) => {
+		// ... (handleIceCandidate logic) ...
 		if (!candidate) return;
 		const pc = peerConnectionRef.current;
 
@@ -214,9 +222,27 @@ const StrangerChatPage = () => {
 			remoteVideoRef.current.srcObject = null;
 		}
 		setTempMessages([]);
+		// ✅ FIX: Reset partner ID and status
+		setPartnerUserId(null); 
 		setFriendStatus("NOT_FRIENDS");
 		iceCandidateQueueRef.current = [];
 	}, []);
+
+	// --- Primary Logic Effect ---
+	
+	// ✅ FIX: New effect to update friend status when partnerUserId changes
+	useEffect(() => {
+		if (partnerUserId) {
+			const status = getFriendshipStatus(partnerUserId);
+			setFriendStatus(status);
+			// Also re-fetch friend data to ensure the status check is accurate 
+			// (handles acceptance/rejection from other places)
+			fetchFriendData(); 
+		} else {
+			setFriendStatus("NOT_FRIENDS");
+		}
+	}, [partnerUserId, getFriendshipStatus, fetchFriendData]);
+
 
 	// --- Main Socket Effect ---
 	useEffect(() => {
@@ -229,6 +255,7 @@ const StrangerChatPage = () => {
 		let isMounted = true;
 		let hasJoinedQueue = false;
 
+		// ... (Media access logic) ...
 		navigator.mediaDevices.getUserMedia({ video: true, audio: true })
 			.then((stream) => {
 				if (!isMounted) {
@@ -254,15 +281,18 @@ const StrangerChatPage = () => {
 				navigate("/");
 			});
 
+
 		const onWaiting = () => {
 			if (isMounted) setStatus("waiting");
 		};
 
 		const onMatched = (data) => {
-			console.log("Socket: matched with", data.partnerId);
+			// ✅ FIX: Store the partner's permanent user ID here
+			console.log("Socket: matched with", data.partnerId, "User ID:", data.partnerUserId); 
 			if (isMounted) {
 				addMessage("System", "Partner found!");
 				setStatus("connected");
+				setPartnerUserId(data.partnerUserId); // ✅ Store the permanent ID
 				
 				const shouldInitiate = socket.id < data.partnerId;
 				console.log(`Should I initiate? ${shouldInitiate}`);
@@ -276,7 +306,7 @@ const StrangerChatPage = () => {
 		const onDisconnected = () => {
 			if (isMounted) {
 				addMessage("System", "Partner disconnected.");
-				closeConnection();
+				closeConnection(); 
 				setStatus("waiting");
 				socket.emit("stranger:joinQueue", { userId: authUser._id });
 			}
@@ -286,23 +316,23 @@ const StrangerChatPage = () => {
 			if (isMounted) addMessage("Stranger", payload.message);
 		};
 
-		// --- UPDATED: handle incoming friend request from partner ---
-		const onFriendRequest = (data) => {
+		const onFriendRequest = () => {
 			if (isMounted) {
 				toast.success("Stranger sent you a friend request!");
-				// update button/UI so the receiver knows a request arrived
-				setFriendStatus("REQUEST_RECEIVED");
+				// ✅ FIX: Force a re-fetch and rely on the status check effect
+				fetchFriendData(); 
 			}
 		};
 
-		// --- NEW: confirm to sender that request was created server-side ---
-		const onFriendRequestSent = (data) => {
+		const onFriendRequestSent = () => {
 			if (isMounted) {
 				toast.success("Friend request sent!");
-				setFriendStatus("REQUEST_SENT");
+				// ✅ FIX: Force a re-fetch and rely on the status check effect
+				fetchFriendData(); 
 			}
 		};
 
+		// ... (WebRTC handlers onOffer, onAnswer, onIce, etc.) ...
 		const onOffer = (payload) => {
 			console.log("Socket: received offer");
 			if (isMounted) handleOffer(payload.sdp);
@@ -316,44 +346,47 @@ const StrangerChatPage = () => {
 		const onIce = (payload) => {
 			if (isMounted) handleIceCandidate(payload.candidate);
 		};
+		// ... (End WebRTC handlers) ...
 
-        // --- *** ADDED/FIXED LISTENERS *** ---
-        const onAddFriendError = ({ error }) => {
-            if (isMounted) {
-                toast.error(error);
-                setFriendStatus("NOT_FRIENDS"); // Reset the button
-            }
-        };
 
-        const onReportSuccess = ({ message }) => {
-            if (isMounted) {
-                toast.success(message);
-                setIsSubmittingReport(false);
-                setIsReportModalOpen(false);
-            }
-        };
+		// --- Error and Report Listeners ---
+        const onAddFriendError = ({ error }) => {
+            if (isMounted) {
+                toast.error(error);
+                // ✅ FIX: Force a status check to reset button if necessary
+                setFriendStatus(getFriendshipStatus(partnerUserId)); 
+            }
+        };
 
-        const onReportError = ({ error }) => {
-            if (isMounted) {
-                toast.error(error);
-                setIsSubmittingReport(false);
-            }
-        };
+        const onReportSuccess = ({ message }) => {
+            if (isMounted) {
+                toast.success(message);
+                setIsSubmittingReport(false);
+                setIsReportModalOpen(false);
+            }
+        };
 
-        socket.on("stranger:addFriendError", onAddFriendError);
-        socket.on("stranger:reportSuccess", onReportSuccess);
-        socket.on("stranger:reportError", onReportError);
-        // --- *** END OF ADDED/FIXED LISTENERS *** ---
+        const onReportError = ({ error }) => {
+            if (isMounted) {
+                toast.error(error);
+                setIsSubmittingReport(false);
+            }
+        };
+
 
 		socket.on("stranger:waiting", onWaiting);
 		socket.on("stranger:matched", onMatched);
 		socket.on("stranger:disconnected", onDisconnected);
 		socket.on("stranger:chatMessage", onChatMessage);
 		socket.on("stranger:friendRequest", onFriendRequest);
-		socket.on("stranger:friendRequestSent", onFriendRequestSent); // <-- new listener
+		socket.on("stranger:friendRequestSent", onFriendRequestSent); 
 		socket.on("webrtc:offer", onOffer);
 		socket.on("webrtc:answer", onAnswer);
 		socket.on("webrtc:ice-candidate", onIce);
+
+        socket.on("stranger:addFriendError", onAddFriendError);
+        socket.on("stranger:reportSuccess", onReportSuccess);
+        socket.on("stranger:reportError", onReportError);
 
 		return () => {
 			isMounted = false;
@@ -373,23 +406,23 @@ const StrangerChatPage = () => {
 				socket.emit("stranger:skip");
 			}
 			
+			// --- Cleanup all listeners ---
 			socket.off("stranger:waiting", onWaiting);
 			socket.off("stranger:matched", onMatched);
 			socket.off("stranger:disconnected", onDisconnected);
 			socket.off("stranger:chatMessage", onChatMessage);
 			socket.off("stranger:friendRequest", onFriendRequest);
-			socket.off("stranger:friendRequestSent", onFriendRequestSent); // <-- cleanup
+			socket.off("stranger:friendRequestSent", onFriendRequestSent); 
 			socket.off("webrtc:offer", onOffer);
 			socket.off("webrtc:answer", onAnswer);
 			socket.off("webrtc:ice-candidate", onIce);
-
-            // --- *** ADDED CLEANUP *** ---
-            socket.off("stranger:addFriendError", onAddFriendError);
-            socket.off("stranger:reportSuccess", onReportSuccess);
-            socket.off("stranger:reportError", onReportError);
-            // --- *** END OF ADDED CLEANUP *** ---
+            socket.off("stranger:addFriendError", onAddFriendError);
+            socket.off("stranger:reportSuccess", onReportSuccess);
+            socket.off("stranger:reportError", onReportError);
 		};
-	}, [socket, authUser, navigate, addMessage, closeConnection, startCall, handleOffer, handleAnswer, handleIceCandidate]);
+	// Added fetchFriendData as a dependency
+	}, [socket, authUser, navigate, addMessage, closeConnection, startCall, handleOffer, handleAnswer, handleIceCandidate, fetchFriendData]); 
+
 
 	const handleSkip = () => {
 		if (status === "idle") return;
@@ -408,14 +441,15 @@ const StrangerChatPage = () => {
 	};
 
 	const handleAddFriend = () => {
-		if (status !== "connected") return;
-		// optimistic UI change: sender sees request sent immediately
-		setFriendStatus("REQUEST_SENT");
-		socket.emit("stranger:addFriend");
-		// backend will emit "stranger:friendRequestSent" back to confirm or "stranger:addFriendError"
+		// ✅ FIX: Only allow sending if we know the partner's ID
+		if (status !== "connected" || !partnerUserId) return; 
+		
+		// The button text will update immediately because the useEffect hook runs
+		socket.emit("stranger:addFriend", { partnerUserId }); 
 	};
 
 	const captureScreenshot = () => {
+		// ... (captureScreenshot logic) ...
 		if (!remoteVideoRef.current || remoteVideoRef.current.videoWidth === 0) {
 			toast.error("Cannot capture screenshot.");
 			return null;
@@ -429,6 +463,7 @@ const StrangerChatPage = () => {
 	};
 
 	const handleReport = () => {
+		// ... (handleReport logic) ...
 		const screenshot = captureScreenshot();
 		if (screenshot) {
 			setReportScreenshot(screenshot);
@@ -437,6 +472,7 @@ const StrangerChatPage = () => {
 	};
 
 	const handleSubmitReport = (reason) => {
+		// ... (handleSubmitReport logic) ...
 		if (!reportScreenshot || !reason) return;
 		setIsSubmittingReport(true);
 		socket.emit("stranger:report", {
@@ -482,13 +518,15 @@ const StrangerChatPage = () => {
 					<div className="p-2 md:p-3 border-b border-base-300">
 						<button
 							className="btn btn-secondary btn-sm md:btn-md w-full"
-							disabled={status !== "connected" || friendStatus !== "NOT_FRIENDS"}
+							// ✅ FIX: Disable if already friends, request sent, or not connected
+							disabled={status !== "connected" || friendStatus === "REQUEST_SENT" || friendStatus === "FRIENDS"}
 							onClick={handleAddFriend}
 						>
 							<UserPlus size={16} className="mr-1"/>
 							{friendStatus === "NOT_FRIENDS" && "Add Friend"}
 							{friendStatus === "REQUEST_SENT" && "Request Sent"}
-							{friendStatus === "REQUEST_RECEIVED" && "Request Received"}
+							{friendStatus === "REQUEST_RECEIVED" && "Pending Request"} {/* Added clear text for pending */}
+							{friendStatus === "FRIENDS" && "Friends"}
 						</button>
 					</div>
 					<div className="flex-1 flex flex-col p-2 md:p-3 overflow-hidden">
