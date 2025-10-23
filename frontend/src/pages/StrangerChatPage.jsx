@@ -23,7 +23,6 @@ const REPORT_REASONS = [
 ];
 
 // --- Report Modal Component ---
-// (This component is unchanged, it was already correct)
 const ReportModal = ({ isOpen, onClose, onSubmit, screenshotPreview, isSubmitting }) => {
 	const [reason, setReason] = useState("");
 	useEffect(() => { if (isOpen) setReason(""); }, [isOpen]);
@@ -90,7 +89,7 @@ const StrangerChatPage = () => {
 		setTempMessages((prev) => [...prev, { sender, message }]);
 	}, []);
 
-    // ... (All WebRTC functions are unchanged) ...
+	// --- WebRTC helper functions (unchanged from yours) ---
 	const createPeerConnection = useCallback(() => {
 		console.log("WebRTC: Creating PeerConnection");
 		const pc = new RTCPeerConnection({
@@ -287,8 +286,21 @@ const StrangerChatPage = () => {
 			if (isMounted) addMessage("Stranger", payload.message);
 		};
 
-		const onFriendRequest = () => {
-			if (isMounted) toast.success("Stranger sent friend request!");
+		// --- UPDATED: handle incoming friend request from partner ---
+		const onFriendRequest = (data) => {
+			if (isMounted) {
+				toast.success("Stranger sent you a friend request!");
+				// update button/UI so the receiver knows a request arrived
+				setFriendStatus("REQUEST_RECEIVED");
+			}
+		};
+
+		// --- NEW: confirm to sender that request was created server-side ---
+		const onFriendRequestSent = (data) => {
+			if (isMounted) {
+				toast.success("Friend request sent!");
+				setFriendStatus("REQUEST_SENT");
+			}
 		};
 
 		const onOffer = (payload) => {
@@ -338,6 +350,7 @@ const StrangerChatPage = () => {
 		socket.on("stranger:disconnected", onDisconnected);
 		socket.on("stranger:chatMessage", onChatMessage);
 		socket.on("stranger:friendRequest", onFriendRequest);
+		socket.on("stranger:friendRequestSent", onFriendRequestSent); // <-- new listener
 		socket.on("webrtc:offer", onOffer);
 		socket.on("webrtc:answer", onAnswer);
 		socket.on("webrtc:ice-candidate", onIce);
@@ -365,6 +378,7 @@ const StrangerChatPage = () => {
 			socket.off("stranger:disconnected", onDisconnected);
 			socket.off("stranger:chatMessage", onChatMessage);
 			socket.off("stranger:friendRequest", onFriendRequest);
+			socket.off("stranger:friendRequestSent", onFriendRequestSent); // <-- cleanup
 			socket.off("webrtc:offer", onOffer);
 			socket.off("webrtc:answer", onAnswer);
 			socket.off("webrtc:ice-candidate", onIce);
@@ -395,9 +409,10 @@ const StrangerChatPage = () => {
 
 	const handleAddFriend = () => {
 		if (status !== "connected") return;
+		// optimistic UI change: sender sees request sent immediately
 		setFriendStatus("REQUEST_SENT");
 		socket.emit("stranger:addFriend");
-        // Removed the toast.success from here. The backend will now confirm.
+		// backend will emit "stranger:friendRequestSent" back to confirm or "stranger:addFriendError"
 	};
 
 	const captureScreenshot = () => {
@@ -430,11 +445,8 @@ const StrangerChatPage = () => {
 			description: "Reported from stranger chat",
 			screenshot: reportScreenshot
 		});
-        // Removed all logic from here. The socket listeners we added
-        // will now handle the success/error response from the backend.
 	};
 
-    // ... (Your JSX/HTML return is unchanged) ...
 	return (
 		<div className="h-screen pt-14 flex flex-col bg-base-300">
 			<div className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 p-2 md:p-4 overflow-hidden">
@@ -468,8 +480,15 @@ const StrangerChatPage = () => {
 						</button>
 					</div>
 					<div className="p-2 md:p-3 border-b border-base-300">
-						<button className="btn btn-secondary btn-sm md:btn-md w-full" disabled={status !== "connected" || friendStatus !== "NOT_FRIENDS"} onClick={handleAddFriend}>
-							<UserPlus size={16} className="mr-1"/> {friendStatus === "NOT_FRIENDS" ? "Add Friend" : "Request Sent"}
+						<button
+							className="btn btn-secondary btn-sm md:btn-md w-full"
+							disabled={status !== "connected" || friendStatus !== "NOT_FRIENDS"}
+							onClick={handleAddFriend}
+						>
+							<UserPlus size={16} className="mr-1"/>
+							{friendStatus === "NOT_FRIENDS" && "Add Friend"}
+							{friendStatus === "REQUEST_SENT" && "Request Sent"}
+							{friendStatus === "REQUEST_RECEIVED" && "Request Received"}
 						</button>
 					</div>
 					<div className="flex-1 flex flex-col p-2 md:p-3 overflow-hidden">
