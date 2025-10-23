@@ -3,6 +3,8 @@ import http from "http";
 import express from "express";
 import cloudinary from "./cloudinary.js";
 import Report from "../models/report.model.js";
+import User from "../models/user.model.js"; // <-- ADDED
+import FriendRequest from "../models/friendRequest.model.js"; // <-- ADDED
 
 const app = express();
 const server = http.createServer(app);
@@ -13,7 +15,7 @@ const io = new Server(server, {
 		origin: [
 			"http://localhost:5173",
 			"https://z-app-frontend-2-0.onrender.com",
-            "https://z-pp-main-com.onrender.com", // Added this from your server.js
+			"https://z-pp-main-com.onrender.com",
 		],
 		credentials: true,
 	},
@@ -45,69 +47,57 @@ export const emitToUser = (userId, event, data) => {
 let waitingQueue = [];
 const matchedPairs = new Map(); // socketId -> partnerSocketId
 
-// ✅ Find and match strangers
 const findMatch = (socket) => {
 	console.log(`🔍 Finding match for ${socket.id}. Queue size: ${waitingQueue.length}`);
 	
-	// Remove current socket from queue if present
 	waitingQueue = waitingQueue.filter(id => id !== socket.id);
 	
 	if (waitingQueue.length > 0) {
-		// Match with first person in queue
 		const partnerSocketId = waitingQueue.shift();
 		const partnerSocket = io.sockets.sockets.get(partnerSocketId);
 		
 		if (partnerSocket) {
-			// Create match
 			matchedPairs.set(socket.id, partnerSocketId);
 			matchedPairs.set(partnerSocketId, socket.id);
 			
 			console.log(`✅ Matched ${socket.id} with ${partnerSocketId}`);
 			
-			// Notify both users
 			socket.emit("stranger:matched", { partnerId: partnerSocketId });
 			partnerSocket.emit("stranger:matched", { partnerId: socket.id });
 		} else {
-			// Partner socket no longer exists, try again
 			console.log(`⚠️ Partner socket ${partnerSocketId} not found, retrying...`);
 			findMatch(socket);
 		}
 	} else {
-		// Add to queue
 		waitingQueue.push(socket.id);
 		console.log(`⏳ Added ${socket.id} to queue. Queue size: ${waitingQueue.length}`);
 		socket.emit("stranger:waiting");
 	}
 };
 
-// ✅ Clean up matches when user disconnects or skips
 const cleanupMatch = (socket) => {
 	const partnerSocketId = matchedPairs.get(socket.id);
 	
 	if (partnerSocketId) {
 		const partnerSocket = io.sockets.sockets.get(partnerSocketId);
 		
-		// Remove both from matched pairs
 		matchedPairs.delete(socket.id);
 		matchedPairs.delete(partnerSocketId);
 		
 		console.log(`🧹 Cleaned up match: ${socket.id} <-> ${partnerSocketId}`);
 		
 		if (partnerSocket) {
-			// Notify partner that stranger disconnected
 			partnerSocket.emit("stranger:disconnected");
 			return partnerSocket;
 		}
 	}
 	
-	// Also remove from waiting queue
 	waitingQueue = waitingQueue.filter(id => id !== socket.id);
 	
 	return null;
 };
 // === END STRANGER CHAT LOGIC ===
 
-// Socket.IO connection logic
 io.on("connection", (socket) => {
 	console.log("✅ User connected:", socket.id);
 	
@@ -138,7 +128,7 @@ io.on("connection", (socket) => {
 	// === STRANGER CHAT (OMEGLE) EVENTS ===
 	socket.on("stranger:joinQueue", (payload) => {
 		console.log(`🚀 ${socket.id} joining stranger queue`, payload);
-		socket.strangerData = payload; // Store user data on socket
+		socket.strangerData = payload; 
 		findMatch(socket);
 	});
 
@@ -146,12 +136,10 @@ io.on("connection", (socket) => {
 		console.log(`⏭️ ${socket.id} skipping stranger`);
 		const partnerSocket = cleanupMatch(socket);
 		
-		// Notify partner if they exist
 		if (partnerSocket) {
 			partnerSocket.emit("stranger:disconnected");
 		}
 		
-		// Re-queue the user who skipped
 		findMatch(socket);
 	});
 
@@ -168,30 +156,96 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	socket.on("stranger:addFriend", () => {
+    // --- *** THIS FUNCTION IS NOW FIXED *** ---
+	socket.on("stranger:addFriend", async () => {
 		const partnerSocketId = matchedPairs.get(socket.id);
-		
-		if (partnerSocketId) {
-			const partnerSocket = io.sockets.sockets.get(partnerSocketId);
-			if (partnerSocket) {
-				console.log(`👥 Friend request from ${socket.id} to ${partnerSocketId}`);
-				
-				// Send both users' data to each other
-				partnerSocket.emit("stranger:friendRequest", {
-					userData: socket.strangerData,
-					fromSocketId: socket.id
-				});
-				
-				socket.emit("stranger:friendRequestSent", {
-					userData: partnerSocket.strangerData
-				});
+		if (!partnerSocketId) return;
+
+		const partnerSocket = io.sockets.sockets.get(partnerSocketId);
+		if (!partnerSocket) return;
+
+		try {
+			// 1. Get both User IDs
+			const senderId = socket.strangerData?.userId;
+			const receiverId = partnerSocket.strangerData?.userId;
+
+			if (!senderId || !receiverId) {
+				throw new Error("User data not found for friend request.");
 			}
+
+			if (senderId === receiverId) {
+				throw new Error("Cannot add yourself as a friend.");
+			}
+
+			// 2. Check if they are already friends or a request exists
+			const [sender, receiver, existingRequest, reverseRequest] = await Promise.all([
+				User.findById(senderId),
+				User.findById(receiverId),
+				FriendRequest.findOne({ sender: senderId, receiver: receiverId }),
+				FriendRequest.findOne({ sender: receiverId, receiver: senderId })
+			]);
+
+			if (!sender || !receiver) throw new Error("User not found.");
+
+			if (sender.friends.includes(receiverId)) {
+				throw new Error("You are already friends.");
+			}
+
+			if (existingRequest) {
+				throw new Error("Friend request already sent.");
+			}
+
+			if (reverseRequest) {
+                // If a request already exists from the other person, just accept it
+                reverseRequest.status = 'accepted';
+                await reverseRequest.save();
+
+                sender.friends.push(receiverId);
+                receiver.friends.push(senderId);
+
+                await sender.save();
+                await receiver.save();
+                
+                console.log(`🤝 Friend request from ${receiverId} to ${senderId} auto-accepted`);
+                
+                // Notify both users of the accepted request
+                partnerSocket.emit("friendrequest:accepted", { userId: senderId });
+                socket.emit("friendrequest:accepted", { userId: receiverId });
+                
+                // Also emit stranger events to update UI
+				partnerSocket.emit("stranger:friendRequest", { userData: socket.strangerData, fromSocketId: socket.id });
+				socket.emit("stranger:friendRequestSent", { userData: partnerSocket.strangerData });
+
+			} else {
+                // 3. Create new friend request
+                const newRequest = new FriendRequest({
+                    sender: senderId,
+                    receiver: receiverId,
+                });
+                await newRequest.save();
+
+                // 4. Emit success events
+                console.log(`👥 Friend request from ${senderId} to ${receiverId} created`);
+                
+                partnerSocket.emit("stranger:friendRequest", { // Notify receiver
+                    userData: socket.strangerData,
+                    fromSocketId: socket.id
+                });
+                
+                socket.emit("stranger:friendRequestSent", { // Confirm to sender
+                    userData: partnerSocket.strangerData
+                });
+            }
+
+		} catch (error) {
+			console.error("Error creating friend request:", error.message);
+			// Notify sender of the error
+			socket.emit("stranger:addFriendError", { error: error.message });
 		}
 	});
+    // --- *** END OF FIXED FUNCTION *** ---
 
-    // --- *** THIS FUNCTION IS NOW FIXED *** ---
 	socket.on("stranger:report", async (payload) => {
-        // FIX 1: Destructure 'screenshot' from the payload
 		const { reporterId, reason, description, category, screenshot } = payload;
 		const partnerSocketId = matchedPairs.get(socket.id);
 		
@@ -200,30 +254,27 @@ io.on("connection", (socket) => {
 			
 			if (partnerSocket && partnerSocket.userId) {
 				try {
-                    // FIX 2: Validate that the screenshot exists
-                    if (!screenshot) {
-                        throw new Error("A screenshot is required as proof.");
-                    }
+					if (!screenshot) {
+						throw new Error("A screenshot is required as proof.");
+					}
 
-                    // FIX 3: Upload the screenshot to Cloudinary
-                    const uploadResponse = await cloudinary.uploader.upload(screenshot, {
-                        resource_type: "image",
-                        folder: "reports",
-                    });
-                    const screenshotUrl = uploadResponse.secure_url;
+					const uploadResponse = await cloudinary.uploader.upload(screenshot, {
+						resource_type: "image",
+						folder: "reports",
+					});
+					const screenshotUrl = uploadResponse.secure_url;
 
-                    if (!screenshotUrl) {
-                        throw new Error("Failed to upload screenshot.");
-                    }
+					if (!screenshotUrl) {
+						throw new Error("Failed to upload screenshot.");
+					}
 
-                    // FIX 4: Save the report WITH the new screenshotUrl
 					const report = new Report({
 						reporter: reporterId,
 						reportedUser: partnerSocket.userId,
 						reason,
 						description,
 						category: category || "stranger_chat",
-                        screenshot: screenshotUrl, // <-- Added the URL
+						screenshot: screenshotUrl,
 						context: {
 							chatType: "stranger",
 							socketIds: [socket.id, partnerSocketId]
@@ -235,15 +286,14 @@ io.on("connection", (socket) => {
 					
 					socket.emit("stranger:reportSuccess", { message: "Report submitted" });
 				} catch (error) {
-                    // Send the specific validation error message back to the user
-                    const errorMessage = error.errors?.screenshot?.message || error.message || "Failed to submit report";
+					const errorMessage = error.errors?.screenshot?.message || error.message || "Failed to submit report";
 					console.error("Error saving report:", errorMessage);
 					socket.emit("stranger:reportError", { error: errorMessage });
 				}
 			}
 		}
 	});
-    // --- *** END OF FIXED FUNCTION *** ---
+	// === END STRANGER CHAT EVENTS ===
 
 	// === WEBRTC SIGNALING (STRANGER CHAT) ===
 	socket.on("webrtc:offer", (payload) => {
@@ -286,6 +336,7 @@ io.on("connection", (socket) => {
 	// === END STRANGER WEBRTC ===
 
 	// === PRIVATE CALL (FRIENDS) EVENTS ===
+	// ... (your private call code remains unchanged) ...
 	socket.on("private:initiate-call", (payload) => {
 		const { receiverId, callerInfo, callType } = payload;
 		const callerId = socket.userId;
