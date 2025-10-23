@@ -1,20 +1,19 @@
 import axios from "axios";
 
-// Get the base URL from the environment variable set during the build process
+// Get the base URL from the environment variable (e.g., https://z-om-backend-4bod.onrender.com)
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
-// Check if the environment variable is set, otherwise fall back or throw error
-if (!apiBaseUrl && import.meta.env.PROD) { // Only error in production
+// Check if the environment variable is set in production
+if (!apiBaseUrl && import.meta.env.PROD) {
   console.error("VITE_API_BASE_URL is not defined in the environment!");
-  // Depending on your setup, you might want to throw an error
-  // or default to a non-functional URL to make the error obvious.
+  // Consider throwing an error or setting a default that will clearly fail
 }
 
 export const axiosInstance = axios.create({
-  // Use the environment variable for production, fallback to localhost for development
-  baseURL: import.meta.env.PROD // Vite uses 'PROD' for production builds
-    ? apiBaseUrl // Use the variable read from .env (provided by Render)
-    : "http://localhost:5001/api", // Use localhost for development (npm run dev)
+  // Use the environment variable + /api for production, fallback to localhost for development
+  baseURL: import.meta.env.PROD
+    ? `${apiBaseUrl}/api` // ✅ ADDED /api prefix here
+    : "http://localhost:5001/api", // Development URL already includes /api
   withCredentials: true, // Send cookies with requests
 });
 
@@ -25,7 +24,8 @@ axiosInstance.interceptors.response.use(
     // Log detailed error information
     console.error("API Error:", {
         message: error.message,
-        config: error.config, // Request config
+        // config: error.config, // Request config can be verbose, uncomment if needed
+        status: error.response?.status, // Response status
         response: error.response?.data // Response data if available
     });
     // Reject the promise so downstream `.catch()` blocks can handle it
