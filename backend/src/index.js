@@ -38,7 +38,7 @@ app.use(cookieParser());
 // CORS configuration
 const allowedOrigins = [
 	FRONTEND_URL,
-	"https://z-app-frontend-2-0.onrender.com",
+	"https://z-pp-main-com.onrender.com",
 	"http://localhost:5173",
 ];
 app.use(
