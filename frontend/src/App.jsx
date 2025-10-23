@@ -14,7 +14,7 @@ import SetupProfilePage from "./pages/SetupProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import MyProfilePage from "./pages/ProfilePage";
 import PublicProfilePage from "./pages/PublicProfilePage";
-import StrangerChatPage from "./pages/StrangerChatPage"; // ✅ 1. Import Stranger Chat Page
+import StrangerChatPage from "./pages/StrangerChatPage"; 
 import AdminDashboard from "./pages/AdminDashboard";
 import SuspendedPage from "./pages/SuspendedPage";
 import GoodbyePage from "./pages/GoodbyePage";
@@ -23,6 +23,7 @@ import ResetPassword from "./pages/ResetPassword";
 
 import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
+import { useFriendStore } from "./store/useFriendStore"; // ✅ 1. Import Friend Store
 
 // Toast UI (no changes)
 const showMessageToast = ({ senderName, senderAvatar, messageText, theme }) => {
@@ -30,9 +31,9 @@ const showMessageToast = ({ senderName, senderAvatar, messageText, theme }) => {
 		(t) => (
 			<div
 				className={`flex items-center gap-3 p-3 rounded-xl shadow-lg transition-all duration-300
-         ${theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-gray-900"}
-         ${t.visible ? "opacity-100" : "opacity-0"}
-        `}
+         ${theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-gray-900"}
+         ${t.visible ? "opacity-100" : "opacity-0"}
+        `}
 			>
 				<img
 					src={senderAvatar}
@@ -55,6 +56,8 @@ const showMessageToast = ({ senderName, senderAvatar, messageText, theme }) => {
 const App = () => {
 	const { authUser, checkAuth, isCheckingAuth, socket, setAuthUser } = useAuthStore();
 	const { theme } = useThemeStore();
+	// ✅ 2. Get the action to update the pending received requests
+	const addPendingReceived = useFriendStore((state) => state.addPendingReceived); 
 	const navigate = useNavigate();
 
 	const forceLogout = useCallback(
@@ -66,18 +69,24 @@ const App = () => {
 		[navigate, setAuthUser]
 	);
 
-	// ... (all your useEffects remain unchanged) ...
 	useEffect(() => {
 		checkAuth();
 	}, [checkAuth]);
+	
 	useEffect(() => {
 		if (authUser?.isSuspended && window.location.pathname !== "/suspended") {
 			navigate("/suspended");
 		}
 	}, [authUser, navigate]);
+	
+	// --- MAIN SOCKET LISTENER EFFECT ---
 	useEffect(() => {
 		if (!socket || !authUser?._id) return;
+
+		// Initial registration
 		socket.emit("register-user", authUser._id);
+
+		// 1. User/Admin actions listener
 		socket.on("user-action", ({ type, reason, until }) => {
 			switch (type) {
 				case "suspended":
@@ -104,6 +113,8 @@ const App = () => {
 					break;
 			}
 		});
+
+		// 2. Message listener
 		socket.on("message-received", ({ sender, text }) => {
 			if (sender?._id !== authUser?._id) {
 				showMessageToast({
@@ -114,11 +125,22 @@ const App = () => {
 				});
 			}
 		});
+
+		// ✅ 3. FRIEND REQUEST LISTENER (The fix for your issue)
+		// The server must emit 'friendRequest:received' to the recipient's socket
+		socket.on("friendRequest:received", (senderProfileData) => {
+			// senderProfileData should contain the full user object of the sender
+			addPendingReceived(senderProfileData); 
+		});
+
+		// 4. Cleanup
 		return () => {
 			socket.off("user-action");
 			socket.off("message-received");
+			socket.off("friendRequest:received"); // ✅ Cleanup the new listener
 		};
-	}, [socket, authUser, navigate, forceLogout, theme]);
+	// Added addPendingReceived to dependencies
+	}, [socket, authUser, navigate, forceLogout, theme, addPendingReceived]); 
 
 	// Show loader while checking auth
 	if (isCheckingAuth) {
@@ -169,7 +191,7 @@ const App = () => {
 					}
 				/>
 
-				{/* --- Protected Routes --- */}
+				{/* --- Protected Routes (unchanged) --- */}
 				<Route
 					path="/"
 					element={
@@ -233,7 +255,7 @@ const App = () => {
 					}
 				/>
 				
-				{/* ✅ 2. Added the new Stranger Chat route */}
+				{/* Stranger Chat route (unchanged) */}
 				<Route
 					path="/stranger"
 					element={
@@ -247,7 +269,7 @@ const App = () => {
 					}
 				/>
 
-				{/* --- Special Pages --- */}
+				{/* --- Special Pages (unchanged) --- */}
 				<Route path="/suspended" element={<SuspendedPage />} />
 				<Route path="/goodbye" element={<GoodbyePage />} />
 				<Route path="/blocked" element={<GoodbyePage />} />
