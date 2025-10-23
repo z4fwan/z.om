@@ -62,6 +62,25 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/friends", friendRoutes);
 
+// --- ADDED THIS SECTION ---
+
+// --- Serve Frontend ---
+// This code assumes your frontend 'dist' folder is one level up and in 'frontend/dist'
+// Adjust the path if your project structure is different
+
+const frontendDistPath = path.join(__dirname, "../frontend/dist");
+
+// 1. Serve static files from the React frontend build
+app.use(express.static(frontendDistPath));
+
+// 2. The "catchall" handler: for any request that doesn't
+//    match one of our API routes, send back React's index.html file.
+app.get("*", (req, res) => {
+	res.sendFile(path.join(frontendDistPath, "index.html"));
+});
+
+// --- END OF ADDED SECTION ---
+
 // --- Default Admin Creation ---
 const createDefaultAdmin = async () => {
 	// ... (your admin creation code is correct) ...
@@ -79,7 +98,9 @@ const createDefaultAdmin = async () => {
 		if (!existingAdmin) {
 			const usernameTaken = await User.findOne({ username: adminUsername });
 			if (usernameTaken) {
-				console.error(`❌ Cannot create admin: Username '${adminUsername}' is already taken.`);
+				console.error(
+					`❌ Cannot create admin: Username '${adminUsername}' is already taken.`
+				);
 				return;
 			}
 
@@ -88,7 +109,7 @@ const createDefaultAdmin = async () => {
 				fullName: "Admin",
 				email: adminEmail,
 				username: adminUsername,
-				nickname: "Admin",
+		        nickname: "Admin",
 				password: hashedPassword,
 				isAdmin: true,
 				isVerified: true,
@@ -101,9 +122,10 @@ const createDefaultAdmin = async () => {
 			// If admin exists but hasn't completed profile (e.g., from old version)
 			existingAdmin.hasCompletedProfile = true;
 			await existingAdmin.save();
-			console.log(`✅ Marked existing admin '${existingAdmin.email}' as profile complete.`);
-		}
-		 else {
+			console.log(
+				`✅ Marked existing admin '${existingAdmin.email}' as profile complete.`
+			);
+		} else {
 			console.log("ℹ️ Admin already exists.");
 		}
 	} catch (error) {
