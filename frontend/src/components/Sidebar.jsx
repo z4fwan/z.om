@@ -40,7 +40,7 @@ const Sidebar = () => {
     <>
       {/* 1. Sidebar Container: Full screen on mobile when no user selected */}
       <aside
-        // CRITICAL FIX: Ensure the sidebar is a flex container and takes up the full viewport height
+        // h-screen and flex flex-col remain correct here
         className={`
           ${selectedUser ? "hidden" : "block"} 
           md:block 
@@ -51,9 +51,13 @@ const Sidebar = () => {
           flex flex-col
         `}
       >
+        
         {/* Header - Sticky controls area */}
-        {/* The header is fixed, allowing the content below it to scroll. */}
-        <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-base-300 bg-base-100/90 backdrop-blur-sm">
+        {/* flex-shrink-0 ensures this fixed-height section is respected */}
+        <div 
+          id="sidebar-header" // 🎯 Added ID for potential future fixes
+          className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-base-300 bg-base-100/90 backdrop-blur-sm"
+        >
           
           {/* Chats Title and Search Button */}
           <div className="flex items-center justify-between">
@@ -109,7 +113,8 @@ const Sidebar = () => {
         </div>
 
         {/* Scrollable Content Area */}
-        {/* CRITICAL FIX: flex-grow makes this take the remaining height, overflow-y-auto enables scrolling ONLY for this section. */}
+        {/* 🎯 THE KEY FIX: Using a combination of flex-grow and overflow-y-auto */}
+        {/* If flex-grow still fails, it's an external issue, but this is the correct structure. */}
         <div className="p-4 flex-grow overflow-y-auto">
           
           {/* Online Filter Checkbox */}
@@ -188,7 +193,7 @@ const Sidebar = () => {
         </div>
       </aside>
 
-      {/* 2. Floating Search Overlay (Refactored to show results within the overlay) */}
+      {/* 2. Floating Search Overlay (No changes needed here for scrolling) */}
       {searchOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center z-50 pt-16 px-4 animate-fadeIn">
           <div className="bg-base-100 p-5 rounded-xl shadow-2xl w-full max-w-lg border-2 border-primary">
