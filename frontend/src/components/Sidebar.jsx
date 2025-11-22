@@ -30,6 +30,7 @@ const Sidebar = () => {
     })
     .filter((u) => (showOnlineOnly ? onlineUsers.includes(u._id) : true))
     .sort((a, b) => {
+      // Sort: Online users come first
       const aOnline = onlineUsers.includes(a._id);
       const bOnline = onlineUsers.includes(b._id);
       return aOnline === bOnline ? 0 : aOnline ? -1 : 1;
@@ -39,22 +40,23 @@ const Sidebar = () => {
     <>
       {/* 1. Sidebar Container: Full screen on mobile when no user selected */}
       <aside
+        // CRITICAL FIX: Ensure the sidebar is a flex container and takes up the full viewport height
         className={`
           ${selectedUser ? "hidden" : "block"} 
           md:block 
-          w-full md:w-96 h-screen 
+          w-full md:w-96 
+          h-screen 
           bg-base-100 
           border-r border-base-300
-          flex flex-col 
+          flex flex-col
         `}
       >
         {/* Header - Sticky controls area */}
-        {/* Adjusted padding/margin for a cleaner header area */}
-        <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-base-300 bg-base-100/90 backdrop-blur-sm sticky top-0 z-10">
+        {/* The header is fixed, allowing the content below it to scroll. */}
+        <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-base-300 bg-base-100/90 backdrop-blur-sm">
           
           {/* Chats Title and Search Button */}
           <div className="flex items-center justify-between">
-            {/* Instagram Style Title */}
             <h3 className="text-2xl font-bold">Chats</h3> 
             <button
               onClick={() => setSearchOpen(true)}
@@ -68,28 +70,27 @@ const Sidebar = () => {
           {/* Stories/Quick Access - Horizontal Scroll */}
           <div className="flex gap-4 overflow-x-auto py-3 -mx-4 px-4 scrollbar-hide border-t border-base-200 mt-3">
             
-            {/* Stranger Chat Button - Styled like a prominent Story/Quick Action */}
+            {/* Stranger Chat Button */}
             <Link
               to="/stranger"
               className="flex-none flex flex-col items-center gap-1 min-w-[64px] active:scale-95 transition-transform"
             >
-              {/* Avatar area with video icon for "Stranger Chat" */}
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-dashed border-base-content/50 flex items-center justify-center bg-base-200">
-                  <Video size={28} className="text-base-content/70" />
+                <Video size={28} className="text-base-content/70" />
               </div>
               <span className="text-sm truncate w-16 text-center text-base-content/70 font-semibold">
                 Stranger
               </span>
             </Link>
             
-            {/* Friend Stories - With Instagram-style colorful ring */}
+            {/* Friend Stories (Max 8 shown) */}
             {friends.slice(0, 8).map((u) => (
               <button
                 key={u._id}
                 onClick={() => {
                   setSelectedUser(u);
                 }}
-                className="flex-none flex flex-col items-center gap-1 min-w-[64px] active:scale-95 transition-transform"
+                className="flex-none flex flex-col items-center gap-1 min-w-[64px] active:scale-95 transition-transform focus:outline-none"
               >
                 {/* Colorful ring effect */}
                 <div className="w-16 h-16 rounded-full p-[2px] border-2 border-transparent ring-2 ring-pink-500 overflow-hidden"> 
@@ -108,9 +109,10 @@ const Sidebar = () => {
         </div>
 
         {/* Scrollable Content Area */}
+        {/* CRITICAL FIX: flex-grow makes this take the remaining height, overflow-y-auto enables scrolling ONLY for this section. */}
         <div className="p-4 flex-grow overflow-y-auto">
           
-          {/* Online Filter Checkbox - Placed above the main list */}
+          {/* Online Filter Checkbox */}
           <label className="flex items-center gap-3 cursor-pointer mb-4">
             <input
               type="checkbox"
@@ -127,7 +129,7 @@ const Sidebar = () => {
               <SidebarSkeleton />
             ) : filteredUsers.length === 0 ? (
               <div className="text-center text-zinc-500 py-10 text-base">
-                No active chats found
+                {query ? "No results found" : "No active chats found"}
               </div>
             ) : (
               filteredUsers.map((user) => {
@@ -138,8 +140,9 @@ const Sidebar = () => {
                     key={user._id}
                     onClick={() => {
                       setSelectedUser(user);
+                      // Close search if it was open on mobile
+                      if (searchOpen) setSearchOpen(false); 
                     }}
-                    // Optimized for cleaner mobile touch/selection
                     className={`w-full flex items-center gap-4 p-3 rounded-lg text-left transition-all hover:bg-base-200 active:bg-base-300 ${
                       selectedUser?._id === user._id
                         ? "bg-base-200" 
@@ -166,7 +169,6 @@ const Sidebar = () => {
                       <div className="font-semibold truncate text-base">
                         {user.nickname || user.username}
                       </div>
-                      {/* Last message should be subtle */}
                       <div className="text-sm text-zinc-500 truncate mt-0.5">
                         {user.lastMessage?.text || "Start a chat!"}
                       </div>
@@ -174,8 +176,7 @@ const Sidebar = () => {
 
                     {/* Unread Count Badge */}
                     {unread > 0 && (
-                      // Small, simple red badge (badge-error/badge-accent for DaisyUI)
-                      <span className="badge badge-error badge-sm rounded-full w-5 h-5 flex-shrink-0 text-white"> 
+                      <span className="badge badge-error badge-sm rounded-full w-5 h-5 flex-shrink-0 text-white flex items-center justify-center p-0"> 
                         {unread > 9 ? "9+" : unread}
                       </span>
                     )}
@@ -187,18 +188,19 @@ const Sidebar = () => {
         </div>
       </aside>
 
-      {/* 2. Floating Search Overlay */}
+      {/* 2. Floating Search Overlay (Refactored to show results within the overlay) */}
       {searchOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center z-50 pt-16 px-4 animate-fadeIn">
-          <div className="bg-base-100 p-5 rounded-xl shadow-lg w-full max-w-lg border-2 border-primary">
-            <div className="flex items-center gap-3">
+          <div className="bg-base-100 p-5 rounded-xl shadow-2xl w-full max-w-lg border-2 border-primary">
+            {/* Search Input Bar */}
+            <div className="flex items-center gap-3 border-b pb-3 border-base-300">
               <Search className="w-6 h-6 text-primary flex-shrink-0" />
               <input
                 type="text"
-                placeholder="Search your friends..."
+                placeholder="Search your friends by name or username..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="flex-1 p-3 outline-none bg-transparent text-base"
+                className="flex-1 p-2 outline-none bg-transparent text-lg"
                 autoFocus
               />
               <button
@@ -213,8 +215,9 @@ const Sidebar = () => {
               </button>
             </div>
 
+            {/* Search Results */}
             {query && (
-              <div className="mt-4 bg-primary/10 rounded-md p-2 animate-fadeIn max-h-96 overflow-y-auto">
+              <div className="mt-4 max-h-80 overflow-y-auto">
                 {filteredUsers.length > 0 ? (
                   filteredUsers.map((user) => (
                     <div
@@ -222,15 +225,28 @@ const Sidebar = () => {
                       onClick={() => {
                         setSelectedUser(user);
                         setSearchOpen(false);
+                        setQuery("");
                       }}
-                      className="p-3 rounded hover:bg-primary/20 active:bg-primary/30 cursor-pointer transition-colors text-base"
+                      className="p-3 my-1 rounded flex items-center gap-3 hover:bg-base-200 active:bg-base-300 cursor-pointer transition-colors text-base"
                     >
-                      {user.nickname || user.username}
+                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                        <img 
+                          src={user.profilePic || "/avatar.png"} 
+                          alt={user.nickname || user.username} 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span className="font-semibold">
+                        {user.nickname || user.username}
+                      </span>
+                      <span className="text-sm text-zinc-500">
+                        {user.username && `(@${user.username})`}
+                      </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-center text-sm text-gray-500 py-4">
-                    No friends found
+                  <p className="text-center text-sm text-zinc-500 py-6">
+                    No friends found matching "{query}"
                   </p>
                 )}
               </div>
